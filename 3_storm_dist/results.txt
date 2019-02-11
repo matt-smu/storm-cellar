@@ -1,0 +1,12 @@
+Running: java -client -Ddaemon.name= -Dstorm.options= -Dstorm.home=/opt/sgx-lkl/sgx-lkl/apps/jvm/3_storm_dist/apache-storm-2.0.0 -Dstorm.log.dir=/opt/sgx-lkl/sgx-lkl/apps/jvm/3_storm_dist/apache-storm-2.0.0/logs -Djava.library.path=/usr/local/lib:/opt/local/lib:/usr/lib:/usr/lib64 -Dstorm.conf.file= -cp /opt/sgx-lkl/sgx-lkl/apps/jvm/3_storm_dist/apache-storm-2.0.0/*:/opt/sgx-lkl/sgx-lkl/apps/jvm/3_storm_dist/apache-storm-2.0.0/lib/*:/opt/sgx-lkl/sgx-lkl/apps/jvm/3_storm_dist/apache-storm-2.0.0/extlib/*:storm-starter-2.0.0.jar:/opt/sgx-lkl/sgx-lkl/apps/jvm/3_storm_dist/apache-storm-2.0.0/conf:/opt/sgx-lkl/sgx-lkl/apps/jvm/3_storm_dist/apache-storm-2.0.0/bin -Dstorm.jar=storm-starter-2.0.0.jar -Dstorm.dependency.jars= -Dstorm.dependency.artifacts={} org.apache.storm.starter.ExclamationTopology
+10:59:11.758 [main] INFO  o.a.s.StormSubmitter - Generated ZooKeeper secret payload for MD5-digest: -7529245802841759968:-6704775307885836470
+10:59:11.821 [main] WARN  o.a.s.v.ConfigValidation - task.heartbeat.frequency.secs is a deprecated config please see class org.apache.storm.Config.TASK_HEARTBEAT_FREQUENCY_SECS for more information.
+10:59:11.921 [main] INFO  o.a.s.u.NimbusClient - Found leader nimbus : nimbus01:6627
+10:59:11.922 [main] INFO  o.a.s.s.a.ClientAuthUtils - Got AutoCreds []
+10:59:11.953 [main] INFO  o.a.s.StormSubmitter - Uploading dependencies - jars...
+10:59:11.954 [main] INFO  o.a.s.StormSubmitter - Uploading dependencies - artifacts...
+10:59:11.954 [main] INFO  o.a.s.StormSubmitter - Dependency Blob keys - jars : [] / artifacts : []
+10:59:11.964 [main] INFO  o.a.s.StormSubmitter - Uploading topology jar storm-starter-2.0.0.jar to assigned location: /opt/sgx-lkl/sgx-lkl/apps/jvm/3_storm_dist/apache-storm-2.0.0/storm-local/nimbus/inbox/stormjar-336c41db-4271-442b-b6ff-c20c182a34b3.jar
+10:59:12.915 [main] INFO  o.a.s.StormSubmitter - Successfully uploaded topology jar to assigned location: /opt/sgx-lkl/sgx-lkl/apps/jvm/3_storm_dist/apache-storm-2.0.0/storm-local/nimbus/inbox/stormjar-336c41db-4271-442b-b6ff-c20c182a34b3.jar
+10:59:12.915 [main] INFO  o.a.s.StormSubmitter - Submitting topology test in distributed mode with conf {"storm.zookeeper.topology.auth.scheme":"digest","storm.zookeeper.topology.auth.payload":"-7529245802841759968:-6704775307885836470","topology.workers":3,"topology.debug":true}
+10:59:13.930 [main] INFO  o.a.s.StormSubmitter - Finished submitting topology: test
