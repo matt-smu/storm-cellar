@@ -1,6 +1,8 @@
 SHELL:=/bin/bash
 # SHELL:=/bin/bash -o pipefail
 
+SGX_LKL_HOME=/opt/sgx-lkl/sgx-lkl
+
 ALPINE_MAJOR=3.7
 ALPINE_VERSION=3.7.0
 ALPINE_ARCH=x86_64
@@ -24,13 +26,14 @@ SGXLKL_TAP=sgxlkl_tap0
 #LOCAL_CLUSTER=
 LOCAL_CLUSTER=org.apache.storm.LocalCluster
 
-STORM_HOME=/opt/storm_20
-#STORM_RELEASE_VERSION=apache-storm-1.2.2
-STORM_RELEASE_VERSION=apache-storm-2.0.0
+#STORM_HOME=/opt/storm_20
+STORM_RELEASE_HOME=/opt/storm-cellar/storm
+STORM_VERSION=2.0.1-SNAPSHOT
+STORM_RELEASE_VERSION=apache-storm-${STORM_VERSION}
 STORM_RELEASE_TAR=${STORM_RELEASE_VERSION}.tar.gz
 STORM_HOME_DIR=${STORM_RELEASE_VERSION}
 STORM_LIB_DIR=${STORM_HOME_DIR}/lib
-STORM_TOPO_JAR=storm-starter-2.0.0.jar
+STORM_TOPO_JAR=storm-starter-${STORM_VERSION}.jar
 STORM_TOPO_CLASS=org.apache.storm.starter.ExclamationTopology
 STORM_CONF=storm.yaml
 
@@ -153,7 +156,7 @@ APP_PARAMS=\
   -Dstorm.home=/app \
   -Dstorm.log.dir=/app/logs \
   -Dstorm.conf.file=/app/conf/storm.yaml \
-  -Dstorm.jar=/app/storm-starter-2.0.0.jar \
+  -Dstorm.jar=/app/${STORM_TOPO_JAR} \
   -Dstorm.dependency.jars= \
   -Dstorm.dependency.artifacts={} \
   -Dlogging.sensitivity=DEBUG \
@@ -178,21 +181,20 @@ ${ALPINE_TAR}:
 	curl -L -o "$@" "https://nl.alpinelinux.org/alpine/v$(ALPINE_MAJOR)/releases/$(ALPINE_ARCH)/alpine-minirootfs-$(ALPINE_VERSION)-$(ALPINE_ARCH).tar.gz"
 
 
-${STORM_RELEASE_TAR}:
+${STORM_RELEASE_TAR}: 
 	# storm is git cloned and dist built in STORM_HOME
-	test -f ${STORM_HOME}/storm-dist/binary/final-package/target/${STORM_RELEASE_TAR} && cp ${STORM_HOME}/storm-dist/binary/final-package/target/${STORM_RELEASE_TAR} ${CURDIR} || true
+	test -f ${STORM_RELEASE_HOME}/storm-dist/binary/final-package/target/${STORM_RELEASE_TAR} && cp ${STORM_RELEASE_HOME}/storm-dist/binary/final-package/target/${STORM_RELEASE_TAR} ${CURDIR} || true
 
 ${STORM_TOPO_JAR}:
-	test -f ${STORM_HOME}/examples/storm-starter/target/storm-starter-2.0.0.jar && cp ${STORM_HOME}/examples/storm-starter/target/storm-starter-2.0.0.jar ${CURDIR} || true
+	test -f ${STORM_RELEASE_HOME}/examples/storm-starter/target/${STORM_TOPO_JAR} && cp ${STORM_RELEASE_HOME}/examples/storm-starter/target/${STORM_TOPO_JAR} ${CURDIR} || true
 
 setup-tap: clean-tap
 	sudo ip tuntap add dev sgxlkl_tap0 mode tap user `whoami`
 	sudo ip link set dev sgxlkl_tap0 up
 	sudo ip addr add dev sgxlkl_tap0 10.0.1.254/24
 
-clean-tap: 
-	sudo ip tuntap del dev sgxlkl_tap0 mode tap || true
-	ip link delete sgxlkl_tap0
+clean-tap:
+	if ip a | grep 'sgxlkl_tap0' ; then ip link delete sgxlkl_tap0; else echo 'no tap exists'; fi
 
 kill-java:
 	jps |  awk '{print $1}' | xargs kill -9
@@ -209,7 +211,7 @@ set-hostname:
 	#echo "hosts: files dns" > /etc/nsswitch.conf
 	
 
-storm-deps: ${STORM_RELEASE_TAR} #${STORM_TOPO_JAR} 
+storm-deps: ${STORM_RELEASE_TAR} ${STORM_TOPO_JAR}
 	tar -C ${CURDIR} -xf ${STORM_RELEASE_TAR}
 	[ -d ${CURDIR}/app/lib ] ||mkdir -p ${CURDIR}/app/lib
 	[ -d ${CURDIR}/app/logs ] ||mkdir -p ${CURDIR}/app/logs
@@ -273,17 +275,16 @@ ${ROOT_FS}: ${ALPINE_TAR} buildenv.sh storm-deps
 
 storm_local: ${ROOT_FS} ${STORM_TOPO_JAR}
 	echo "Running storm2 aio(local) enclave example:"
-	LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${SGXLKL_PARAMS} ${CURDIR}/../../../build/sgx-lkl-run ${CURDIR}/${ROOT_FS} /opt/j2re-image/bin/java ${JVM_PARAMS} ${JAVA_PARAMS} ${APP_PARAMS} ${LOCAL_CLUSTER} ${STORM_TOPO_CLASS} ${TEE2LOG}
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${SGXLKL_PARAMS} ${SGX_LKL_HOME}/build/sgx-lkl-run ${CURDIR}/${ROOT_FS} /opt/j2re-image/bin/java ${JVM_PARAMS} ${JAVA_PARAMS} ${APP_PARAMS} ${LOCAL_CLUSTER} ${STORM_TOPO_CLASS} ${TEE2LOG}
 
-#storm_supervisor: ${ROOT_FS} setup-tap
-storm_supervisor: ${ROOT_FS}
+storm_supervisor: ${ROOT_FS} setup-tap
 	echo "Running storm2 dist enclave example:"
-	LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${SGXLKL_PARAMS} ${CURDIR}/../../../build/sgx-lkl-run ${CURDIR}/${ROOT_FS}  /opt/j2re-image/bin/java ${JVM_PARAMS} -server -cp ${CLASSPATH} -Ddaemon.name=supervisor -Dstorm.options= -Dstorm.home=/app -Dstorm.log.dir=/app/logs -Dstorm.conf.file=/app/conf/storm.yaml -Dstorm.jar=/app/storm-starter-2.0.0.jar -Dstorm.dependency.jars= -Dstorm.dependency.artifacts={} -Dlogging.sensitivity=DEBUG -Djava.net.preferIPv4Stack=true -Djava.deserialization.disabled=true -Dlogfile.name=supervisor.log org.apache.storm.daemon.supervisor.Supervisor ${TEE2LOG}
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${SGXLKL_PARAMS} ${SGX_LKL_HOME}/build/sgx-lkl-run ${CURDIR}/${ROOT_FS}  /opt/j2re-image/bin/java ${JVM_PARAMS} -server -cp ${CLASSPATH} -Ddaemon.name=supervisor -Dstorm.options= -Dstorm.home=/app -Dstorm.log.dir=/app/logs -Dstorm.conf.file=/app/conf/storm.yaml -Dstorm.jar=/app/${STORM_TOPO_JAR} -Dstorm.dependency.jars= -Dstorm.dependency.artifacts={} -Dlogging.sensitivity=DEBUG -Djava.net.preferIPv4Stack=true -Djava.deserialization.disabled=true -Dlogfile.name=supervisor.log org.apache.storm.daemon.supervisor.Supervisor ${TEE2LOG}
 
 test: ${ROOT_FS}
 	echo "Running storm enclave example:"
-	LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${SGXLKL_PARAMS} ${CURDIR}/../../../build/sgx-lkl-run ${CURDIR}/${ROOT_FS}  /opt/j2re-image/bin/java ${JVM_PARAMS} ${JAVA_PARAMS} ${APP_PARAMS} ${LOCAL_CLUSTER} ${STORM_EG_CLASS} ${TEE2LOG}
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${SGXLKL_PARAMS} ${SGX_LKL_HOME}/build/sgx-lkl-run ${CURDIR}/${ROOT_FS}  /opt/j2re-image/bin/java ${JVM_PARAMS} ${JAVA_PARAMS} ${APP_PARAMS} ${LOCAL_CLUSTER} ${STORM_EG_CLASS} ${TEE2LOG}
 
 test_gdb: ${ROOT_FS}
 	echo "Running storm Hello World example under gdb:"
-	LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${SGX_PARAMS} ../../../gdb/sgx-lkl-gdb --args ${CURDIR}/../../../build/sgx-lkl-run ${CURDIR}/${ROOT_FS}  /opt/j2re-image/bin/java ${JVM_PARAMS} ${JAVA_PARAMS} ${APP_PARAMS} org.apache.storm.starter.ExclamationTopology
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${SGX_PARAMS} ${SGX_LKL_HOME}/gdb/sgx-lkl-gdb --args ${SGX_LKL_HOME}/build/sgx-lkl-run ${CURDIR}/${ROOT_FS}  /opt/j2re-image/bin/java ${JVM_PARAMS} ${JAVA_PARAMS} ${APP_PARAMS} org.apache.storm.starter.ExclamationTopology
