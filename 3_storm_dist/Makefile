@@ -28,7 +28,8 @@ LOCAL_CLUSTER=org.apache.storm.LocalCluster
 
 #STORM_HOME=/opt/storm_20
 STORM_RELEASE_HOME=/opt/storm-cellar/storm
-STORM_VERSION=2.0.1-SNAPSHOT
+#STORM_VERSION=2.0.1-SNAPSHOT
+STORM_VERSION=2.0.0
 STORM_RELEASE_VERSION=apache-storm-${STORM_VERSION}
 STORM_RELEASE_TAR=${STORM_RELEASE_VERSION}.tar.gz
 STORM_HOME_DIR=${STORM_RELEASE_VERSION}
@@ -173,9 +174,11 @@ APP_PARAMS=\
 all: ${ROOT_FS}
 
 clean:
-	test -f HelloWorld.class && rm HelloWorld.class || true
+	test -f ${STORM_RELEASE_TAR} && rm ${STORM_RELEASE_TAR} || true
+	test -f ${STORM_TOPO_JAR} && rm ${STORM_TOPO_JAR} || true
 	test -f ${ROOT_FS} && rm ${ROOT_FS} || true
 	test -d ${CURDIR}/app && rm -rf ${CURDIR}/app || true
+	test -d ${STORM_RELEASE_VERSION} && rm -rf ${STORM_RELEASE_VERSION} || true
 
 ${ALPINE_TAR}:
 	curl -L -o "$@" "https://nl.alpinelinux.org/alpine/v$(ALPINE_MAJOR)/releases/$(ALPINE_ARCH)/alpine-minirootfs-$(ALPINE_VERSION)-$(ALPINE_ARCH).tar.gz"
@@ -288,3 +291,21 @@ test: ${ROOT_FS}
 test_gdb: ${ROOT_FS}
 	echo "Running storm Hello World example under gdb:"
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${SGX_PARAMS} ${SGX_LKL_HOME}/gdb/sgx-lkl-gdb --args ${SGX_LKL_HOME}/build/sgx-lkl-run ${CURDIR}/${ROOT_FS}  /opt/j2re-image/bin/java ${JVM_PARAMS} ${JAVA_PARAMS} ${APP_PARAMS} org.apache.storm.starter.ExclamationTopology
+
+run_storm_critters: storm-deps
+	./${STORM_HOME_DIR}/bin/storm dev-zookeeper & ./${STORM_HOME_DIR}/bin/storm nimbus & ./${STORM_HOME_DIR}/bin/storm ui & ./${STORM_HOME_DIR}/bin/storm logviewer &
+
+kill_storm_critters:
+	echo "killing all javas... should probably grep for storm ones"
+	jps | awk '{ if ($$2 != "Jps")  print $$1 }' | xargs kill -9 
+
+storm_core:
+	echo "hi my name is ${STORM_RELEASE_HOME}"
+	echo ${STORM_RELEASE_HOME}
+	mvn -f ${STORM_RELEASE_HOME}/ -DskipTests=true clean install
+
+rebuild_dist: 
+	echo "hi my name is ${STORM_RELEASE_HOME}"
+	mvn -f ${STORM_RELEASE_HOME}/storm-dist/binary/ -Dgpg.skip clean package
+
+
